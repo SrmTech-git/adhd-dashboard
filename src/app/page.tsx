@@ -7,13 +7,15 @@ import { DailyRoutineItem, TodoItem, Event, Reminder, DashboardData } from '@/ty
 import type { Notification } from '@/types/dashboard';
 import { getDefaultDailyRoutine, getDefaultTodos, getDefaultEvents, getDefaultReminders } from '@/utils/defaultData';
 import { monthNames, getDaysInMonth, getFirstDayOfMonth, generateCalendarDays, isToday, formatDateForDisplay, formatTo12Hour } from '@/utils/dateHelpers';
-import { showNotification, dismissNotification, snoozeNotification, requestNotificationPermission } 
+import { showNotification, dismissNotification, snoozeNotification, requestNotificationPermission }
 from '@/utils/notificationHelpers';
+import { soundService, SoundType } from '@/lib/soundService';
 import CalendarComponent from '@/component/Calendar/Calendar';
 import Timer from '@/component/Timer/Timer';
 import TodaysSchedule from '@/component/Schedule/TodaysSchedule';
 import DailyRoutine from '@/component/DailyRoutine/DailyRoutine';
 import TodoList from '@/component/TodoList/TodoList';
+import Reminders from '@/component/Reminders/Reminders';
 
 const ADHDDashboard = () => {
   // Get current date for display
@@ -67,6 +69,8 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   const [newEventTitle, setNewEventTitle] = useState('');
 
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [soundVolume, setSoundVolume] = useState(0.7);
+  const [audioReady, setAudioReady] = useState(false);
 
   const currentTheme = isDarkMode ? theme.dark : theme.light;
 
@@ -96,6 +100,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
       setEvents(savedData.events || []);
       setReminders(savedData.reminders || getDefaultReminders());
       setSoundEnabled(savedData.soundEnabled !== undefined ? savedData.soundEnabled : true);
+      setSoundVolume(savedData.soundVolume !== undefined ? savedData.soundVolume : 0.7);
       setIsDarkMode(savedData.isDarkMode !== undefined ? savedData.isDarkMode : false);
       
       // Handle daily routine reset
@@ -136,6 +141,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         reminders,
         lastResetDate,
         soundEnabled,
+        soundVolume,
         isDarkMode,
         lastUpdated: new Date().toISOString()
       };
@@ -146,7 +152,48 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         setTimeout(() => setShowSaveIndicator(false), 1500);
       }
     }
-  }, [dailyRoutine, todos, events, reminders, lastResetDate, soundEnabled, isDarkMode, isInitialized]);
+  }, [dailyRoutine, todos, events, reminders, lastResetDate, soundEnabled, soundVolume, isDarkMode, isInitialized]);
+
+  // Update sound service when sound preferences change
+  useEffect(() => {
+    soundService.setEnabled(soundEnabled);
+    soundService.setGlobalVolume(soundVolume);
+  }, [soundEnabled, soundVolume]);
+
+  // Handle user interaction for audio context
+  useEffect(() => {
+    const enableAudio = async () => {
+      if (soundEnabled) {
+        try {
+          await soundService.requestAudioPermission();
+          console.log('Audio context enabled for dashboard');
+        } catch (error) {
+          console.warn('Failed to enable audio context:', error);
+        }
+      }
+    };
+
+    // Enable audio on first user interaction
+    const handleInteraction = async () => {
+      await enableAudio();
+      setAudioReady(true);
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+
+    if (soundEnabled) {
+      document.addEventListener('click', handleInteraction, { once: true });
+      document.addEventListener('keydown', handleInteraction, { once: true });
+      document.addEventListener('touchstart', handleInteraction, { once: true });
+    }
+
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [soundEnabled]);
 
 
 
@@ -203,10 +250,16 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
 
         if (shouldShow) {
           const notification = showNotification(reminder.text, 'Gentle reminder 💜');
-          setActiveNotifications(prev => [...prev, notification]);          
+          setActiveNotifications(prev => [...prev, notification]);
+
+          // Play gentle reminder sound
+          if (soundEnabled) {
+            soundService.play(SoundType.REMINDER_GENTLE);
+          }
+
           // Update lastShown
-          const updatedReminders = reminders.map(r => 
-            r.id === reminder.id 
+          const updatedReminders = reminders.map(r =>
+            r.id === reminder.id
               ? { ...r, lastShown: reminder.frequency === 'daily' ? todayKey : now.toISOString() }
               : r
           );
@@ -243,6 +296,11 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
             );
             setActiveNotifications(prev => [...prev, notification]);
             localStorage.setItem(alertKey, 'true');
+
+            // Play event warning sound
+            if (soundEnabled) {
+              soundService.play(SoundType.EVENT_WARNING);
+            }
           }
         }
       });
@@ -474,6 +532,41 @@ const formatReminderTime = (reminder: Reminder) => {
           {isDarkMode ? '☀️' : '🌙'} {isDarkMode ? 'Light' : 'Dark'}
         </button>
 
+        {/* Sound Toggle */}
+        <button
+          onClick={() => setSoundEnabled(!soundEnabled)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: '10rem',
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '2rem',
+            color: 'white',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            fontSize: '0.875rem',
+            transition: 'all 0.2s',
+            opacity: soundEnabled ? 1 : 0.6
+          }}
+          title={
+            soundEnabled
+              ? (audioReady ? 'Sounds enabled and ready' : 'Sounds enabled (click anywhere to activate)')
+              : 'Enable sounds'
+          }
+        >
+          {soundEnabled ? (audioReady ? '🔊' : '🔊⚡') : '🔇'} Sound
+          {soundEnabled && !audioReady && (
+            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+              (click to activate)
+            </span>
+          )}
+        </button>
+
         {showSaveIndicator && (
           <div style={{
             position: 'absolute',
@@ -610,207 +703,29 @@ const formatReminderTime = (reminder: Reminder) => {
 
 
         {/* Reminders Section */}
-        <section style={{
-          background: currentTheme.cardBackground,
-          borderRadius: '1rem',
-          padding: '1.5rem',
-          boxShadow: isDarkMode ? '0 10px 30px rgba(0, 0, 0, 0.3)' : '0 10px 30px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '1.5rem',
-            color: currentTheme.textPrimary
-          }}>
-            <Bell size={20} />
-            <h2 style={{ flex: 1, fontSize: '1.25rem', margin: 0 }}>Gentle Reminders</h2>
-            {notificationPermission === 'default' && (
-                <button onClick={async () => {
-                  const permission = await requestNotificationPermission();
-                  setNotificationPermission(permission);
-                }} style={{
-                padding: '0.25rem 0.75rem',
-                background: currentTheme.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                fontSize: '0.75rem'
-              }}>
-                Enable notifications
-              </button>
-            )}
-          </div>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-            marginBottom: '1rem',
-            maxHeight: '300px',
-            overflowY: 'auto'
-          }}>
-            {reminders.map(reminder => (
-              <div key={reminder.id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.5rem',
-                background: editingReminder?.id === reminder.id ? currentTheme.backgroundHover : currentTheme.backgroundMuted,
-                borderRadius: '0.5rem',
-                border: editingReminder?.id === reminder.id ? `1px solid ${currentTheme.primary}` : 'none'
-              }}>
-                <button 
-                  onClick={() => toggleReminder(reminder.id)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    color: reminder.enabled ? currentTheme.primary : currentTheme.textMuted
-                  }}
-                  title={reminder.enabled ? 'Disable reminder' : 'Enable reminder'}
-                >
-                  {reminder.enabled ? <Bell size={18} /> : <BellOff size={18} />}
-                </button>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <span style={{
-                    color: reminder.enabled ? currentTheme.textPrimary : currentTheme.textMuted,
-                    textDecoration: reminder.enabled ? 'none' : 'line-through'
-                  }}>
-                    {reminder.text}
-                  </span>
-                  <span style={{ fontSize: '0.875rem', color: currentTheme.textSecondary }}>
-                    {formatReminderTime(reminder)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.25rem' }}>
-                  <button 
-                    onClick={() => startEditingReminder(reminder)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: currentTheme.primary,
-                      cursor: 'pointer',
-                      padding: '0.5rem',
-                      borderRadius: '0.25rem'
-                    }}
-                    title="Edit reminder"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => removeReminder(reminder.id)} 
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: currentTheme.textMuted,
-                      cursor: 'pointer',
-                      padding: '0.25rem',
-                      borderRadius: '0.25rem'
-                    }}
-                    title="Delete reminder"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div style={{ borderTop: `1px solid ${currentTheme.border}`, paddingTop: '1rem' }}>
-            <h4 style={{
-              margin: '0 0 0.75rem 0',
-              color: currentTheme.textPrimary,
-              fontSize: '0.875rem',
-              fontWeight: 600
-            }}>
-              {editingReminder ? 'Edit Reminder' : 'Add New Reminder'}
-            </h4>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                placeholder="Reminder text..."
-                value={newReminderText}
-                onChange={(e) => setNewReminderText(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && saveReminder()}
-                style={{
-                  flex: 1,
-                  minWidth: '200px',
-                  padding: '0.5rem',
-                  border: `1px solid ${currentTheme.border}`,
-                  borderRadius: '0.5rem',
-                  outline: 'none',
-                  background: currentTheme.cardBackground,
-                  color: currentTheme.textPrimary
-                }}
-              />
-              <select 
-                value={newReminderFrequency}
-                onChange={(e) => setNewReminderFrequency(e.target.value)}
-                style={{
-                  padding: '0.5rem',
-                  border: `1px solid ${currentTheme.border}`,
-                  borderRadius: '0.5rem',
-                  outline: 'none',
-                  background: currentTheme.cardBackground,
-                  color: currentTheme.textPrimary
-                }}
-              >
-                <option value="once">Once</option>
-                <option value="daily">Daily</option>
-                <option value="interval-1">Every hour</option>
-                <option value="interval-2">Every 2 hours</option>
-                <option value="interval-3">Every 3 hours</option>
-              </select>
-              {(newReminderFrequency === 'once' || newReminderFrequency === 'daily') && (
-                <input
-                  type="time"
-                  value={newReminderTime}
-                  onChange={(e) => setNewReminderTime(e.target.value)}
-                  style={{
-                    padding: '0.5rem',
-                    border: `1px solid ${currentTheme.border}`,
-                    borderRadius: '0.5rem',
-                    outline: 'none',
-                    background: currentTheme.cardBackground,
-                    color: currentTheme.textPrimary
-                  }}
-                />
-              )}
-              <button onClick={saveReminder} style={{
-                padding: '0.5rem 1rem',
-                background: currentTheme.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.5rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem'
-              }}>
-                {editingReminder ? (
-                  <>Update <Save size={16} /></>
-                ) : (
-                  <>Add <Plus size={16} /></>
-                )}
-              </button>
-              {editingReminder && (
-                <button onClick={cancelEditingReminder} style={{
-                  padding: '0.5rem 1rem',
-                  background: currentTheme.backgroundMuted,
-                  color: currentTheme.textSecondary,
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  cursor: 'pointer'
-                }}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
+        <Reminders
+          reminders={reminders}
+          setReminders={setReminders}
+          currentTheme={currentTheme}
+          isDarkMode={isDarkMode}
+          notificationPermission={notificationPermission}
+          setNotificationPermission={setNotificationPermission}
+          newReminderText={newReminderText}
+          setNewReminderText={setNewReminderText}
+          newReminderTime={newReminderTime}
+          setNewReminderTime={setNewReminderTime}
+          newReminderFrequency={newReminderFrequency}
+          setNewReminderFrequency={setNewReminderFrequency}
+          editingReminder={editingReminder}
+          setEditingReminder={setEditingReminder}
+          saveReminder={saveReminder}
+          startEditingReminder={startEditingReminder}
+          cancelEditingReminder={cancelEditingReminder}
+          toggleReminder={toggleReminder}
+          removeReminder={removeReminder}
+          formatReminderTime={formatReminderTime}
+          soundEnabled={soundEnabled}
+        />
 
         {/* Calendar Section - Full Width */}
         {/* Calendar Section */}

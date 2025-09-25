@@ -43,6 +43,7 @@ export interface DashboardData {
   reminders: Reminder[];
   lastResetDate: string;
   soundEnabled: boolean;
+  soundVolume?: number; // Optional for backward compatibility
   isDarkMode: boolean;
   lastUpdated: string;
 }

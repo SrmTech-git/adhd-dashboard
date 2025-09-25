@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, Play, Pause, RotateCcw } from 'lucide-react';
 import { showNotification } from '@/utils/notificationHelpers';
+import { soundService, SoundType } from '@/lib/soundService';
 import type { Notification } from '@/types/dashboard';
 
 interface TimerProps {
@@ -24,35 +25,50 @@ const Timer: React.FC<TimerProps> = ({
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState(25);
 
-  // Sound system - Simple HTML5 Audio
-  const timerSound = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize timer completion sound
+  // Initialize sound service
   useEffect(() => {
-    try {
-      // Simple HTML5 Audio - we'll need an actual audio file for this to work
-      // For now, we'll create the audio element but it won't work until we add a file
-      timerSound.current = new Audio('/sounds/timer-complete.mp3');
-      timerSound.current.volume = 0.6;
-    } catch (error) {
-      console.log('Audio initialization failed, continuing without sound:', error);
-      timerSound.current = null;
-    }
-  }, []);
+    // Set the sound enabled state in the sound service
+    soundService.setEnabled(soundEnabled);
+  }, [soundEnabled]);
 
-  // Play timer completion sound
-  const playTimerSound = () => {
-    if (!soundEnabled || !timerSound.current) return;
-    
-    try {
-      // Reset audio to beginning and play
-      timerSound.current.currentTime = 0;
-      timerSound.current.play().catch(e => {
-        // Graceful fallback - don't break if sound fails
-        console.log('Timer sound could not play (file may not exist):', e);
-      });
-    } catch (error) {
-      console.log('Timer sound error:', error);
+  // Play timer sounds with appropriate feedback
+  const playTimerStartSound = async () => {
+    if (soundEnabled) {
+      try {
+        await soundService.play(SoundType.TIMER_START);
+      } catch (error) {
+        console.log('Timer start sound failed:', error);
+      }
+    }
+  };
+
+  const playTimerPauseSound = async () => {
+    if (soundEnabled) {
+      try {
+        await soundService.play(SoundType.TIMER_PAUSE);
+      } catch (error) {
+        console.log('Timer pause sound failed:', error);
+      }
+    }
+  };
+
+  const playTimerResetSound = async () => {
+    if (soundEnabled) {
+      try {
+        await soundService.play(SoundType.TIMER_RESET);
+      } catch (error) {
+        console.log('Timer reset sound failed:', error);
+      }
+    }
+  };
+
+  const playTimerCompleteSound = async () => {
+    if (soundEnabled) {
+      try {
+        await soundService.play(SoundType.TIMER_COMPLETE, { volume: 0.8 });
+      } catch (error) {
+        console.log('Timer complete sound failed:', error);
+      }
     }
   };
 
@@ -70,7 +86,7 @@ const Timer: React.FC<TimerProps> = ({
         } else {
           // Timer finished
           setIsTimerRunning(false);
-          playTimerSound(); // Play completion sound
+          playTimerCompleteSound(); // Play completion sound
           const notification = showNotification('Timer finished!', 'Time for a break! Great job focusing! 🎉');
           setActiveNotifications(prev => [...prev, notification]);
         }
@@ -83,12 +99,21 @@ const Timer: React.FC<TimerProps> = ({
   }, [isTimerRunning, timerMinutes, timerSeconds, setActiveNotifications]);
 
   // Timer controls
-  const startTimer = () => setIsTimerRunning(true);
-  const pauseTimer = () => setIsTimerRunning(false);
+  const startTimer = () => {
+    setIsTimerRunning(true);
+    playTimerStartSound();
+  };
+
+  const pauseTimer = () => {
+    setIsTimerRunning(false);
+    playTimerPauseSound();
+  };
+
   const resetTimer = () => {
     setIsTimerRunning(false);
     setTimerMinutes(selectedDuration);
     setTimerSeconds(0);
+    playTimerResetSound();
   };
 
   const setQuickTimer = (minutes: number) => {
