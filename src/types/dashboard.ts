@@ -44,6 +44,7 @@ export interface DashboardData {
   lastResetDate: string;
   soundEnabled: boolean;
   soundVolume?: number; // Optional for backward compatibility
+  snoozedNotifications?: {id: number, showAt: number, originalNotification: Notification}[]; // Optional for backward compatibility
   isDarkMode: boolean;
   lastUpdated: string;
 }

@@ -58,6 +58,7 @@ const [newReminderTime, setNewReminderTime] = useState<string>('');
 const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
 const [activeNotifications, setActiveNotifications] = useState<Notification[]>([]);
+  const [snoozedNotifications, setSnoozedNotifications] = useState<{id: number, showAt: number, originalNotification: Notification}[]>([]);
   const lastReminderCheck = useRef<number | null>(null);
 
 
@@ -77,6 +78,26 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   // Toggle theme
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  // Handle snoozing notifications
+  const snoozeNotificationHandler = (notification: Notification, minutes: number = 10) => {
+    const showAt = Date.now() + (minutes * 60 * 1000); // Convert minutes to milliseconds
+
+    // Remove from active notifications
+    setActiveNotifications(prev => prev.filter(n => n.id !== notification.id));
+
+    // Add to snoozed notifications
+    setSnoozedNotifications(prev => [
+      ...prev,
+      {
+        id: notification.id,
+        showAt,
+        originalNotification: notification
+      }
+    ]);
+
+    console.log(`Snoozed notification "${notification.title}" for ${minutes} minutes`);
   };
 
   
@@ -101,6 +122,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
       setReminders(savedData.reminders || getDefaultReminders());
       setSoundEnabled(savedData.soundEnabled !== undefined ? savedData.soundEnabled : true);
       setSoundVolume(savedData.soundVolume !== undefined ? savedData.soundVolume : 0.7);
+      setSnoozedNotifications(savedData.snoozedNotifications || []);
       setIsDarkMode(savedData.isDarkMode !== undefined ? savedData.isDarkMode : false);
       
       // Handle daily routine reset
@@ -142,6 +164,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         lastResetDate,
         soundEnabled,
         soundVolume,
+        snoozedNotifications,
         isDarkMode,
         lastUpdated: new Date().toISOString()
       };
@@ -152,13 +175,43 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         setTimeout(() => setShowSaveIndicator(false), 1500);
       }
     }
-  }, [dailyRoutine, todos, events, reminders, lastResetDate, soundEnabled, soundVolume, isDarkMode, isInitialized]);
+  }, [dailyRoutine, todos, events, reminders, lastResetDate, soundEnabled, soundVolume, snoozedNotifications, isDarkMode, isInitialized]);
 
   // Update sound service when sound preferences change
   useEffect(() => {
     soundService.setEnabled(soundEnabled);
     soundService.setGlobalVolume(soundVolume);
   }, [soundEnabled, soundVolume]);
+
+  // Check for snoozed notifications to re-show
+  useEffect(() => {
+    const checkSnoozedNotifications = () => {
+      const now = Date.now();
+      const toReshow: Notification[] = [];
+      const stillSnoozed: {id: number, showAt: number, originalNotification: Notification}[] = [];
+
+      snoozedNotifications.forEach(snoozed => {
+        if (now >= snoozed.showAt) {
+          // Time to re-show this notification
+          toReshow.push(snoozed.originalNotification);
+          console.log(`Re-showing snoozed notification: "${snoozed.originalNotification.title}"`);
+        } else {
+          // Still snoozed
+          stillSnoozed.push(snoozed);
+        }
+      });
+
+      if (toReshow.length > 0) {
+        setActiveNotifications(prev => [...prev, ...toReshow]);
+        setSnoozedNotifications(stillSnoozed);
+      }
+    };
+
+    // Check every 30 seconds
+    const interval = setInterval(checkSnoozedNotifications, 30000);
+
+    return () => clearInterval(interval);
+  }, [snoozedNotifications]);
 
   // Handle user interaction for audio context
   useEffect(() => {
@@ -507,65 +560,135 @@ const formatReminderTime = (reminder: Reminder) => {
         <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>Focus Dashboard</h1>
         <p style={{ fontSize: '1.1rem', opacity: 0.9 }}>{todayString}</p>
         
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
+        {/* Theme Toggle Switch */}
+        <div
           style={{
             position: 'absolute',
-            top: 0,
+            top: '0.25rem',
             left: '1rem',
-            background: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(10px)',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '2rem',
-            color: 'white',
-            cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            transition: 'all 0.2s'
+            gap: '0.5rem'
           }}
-          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-          {isDarkMode ? '☀️' : '🌙'} {isDarkMode ? 'Light' : 'Dark'}
-        </button>
+          <span style={{
+            color: 'white',
+            fontSize: '0.875rem',
+            opacity: 0.9
+          }}>
+            {isDarkMode ? '☀️' : '🌙'}
+          </span>
+          <div
+            onClick={toggleTheme}
+            style={{
+              width: '3rem',
+              height: '1.5rem',
+              background: isDarkMode
+                ? 'rgba(251, 191, 36, 0.8)'  // Yellow/Orange when LIGHT mode (sun)
+                : 'rgba(99, 102, 241, 0.8)', // Blue/Purple when DARK mode (moon)
+              borderRadius: '0.75rem',
+              position: 'relative',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {/* Toggle Slider */}
+            <div
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                background: 'white',
+                borderRadius: '50%',
+                position: 'absolute',
+                top: '0.125rem',
+                left: isDarkMode ? '1.625rem' : '0.125rem', // Slide right when LIGHT mode
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.625rem'
+              }}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </div>
+          </div>
+        </div>
 
-        {/* Sound Toggle */}
-        <button
-          onClick={() => setSoundEnabled(!soundEnabled)}
+        {/* Sound Toggle Switch */}
+        <div
           style={{
             position: 'absolute',
-            top: 0,
-            left: '10rem',
-            background: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(10px)',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: '2rem',
-            color: 'white',
-            cursor: 'pointer',
+            top: '3rem',
+            left: '1rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            transition: 'all 0.2s',
-            opacity: soundEnabled ? 1 : 0.6
+            gap: '0.5rem'
           }}
-          title={
-            soundEnabled
-              ? (audioReady ? 'Sounds enabled and ready' : 'Sounds enabled (click anywhere to activate)')
-              : 'Enable sounds'
-          }
         >
-          {soundEnabled ? (audioReady ? '🔊' : '🔊⚡') : '🔇'} Sound
+          <span style={{
+            color: 'white',
+            fontSize: '0.875rem',
+            opacity: 0.9
+          }}>
+            {soundEnabled ? (audioReady ? '🔊' : '🔊⚡') : '🔇'}
+          </span>
+          <div
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            style={{
+              width: '3rem',
+              height: '1.5rem',
+              background: soundEnabled
+                ? 'rgba(74, 222, 128, 0.8)'  // Green when ON
+                : 'rgba(107, 114, 128, 0.5)', // Gray when OFF
+              borderRadius: '0.75rem',
+              position: 'relative',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+            title={
+              soundEnabled
+                ? (audioReady ? 'Sounds enabled and ready - Click to disable' : 'Sounds enabled (click anywhere to activate) - Click to disable')
+                : 'Enable sounds'
+            }
+          >
+            {/* Toggle Slider */}
+            <div
+              style={{
+                width: '1.25rem',
+                height: '1.25rem',
+                background: 'white',
+                borderRadius: '50%',
+                position: 'absolute',
+                top: '0.125rem',
+                left: soundEnabled ? '1.625rem' : '0.125rem', // Slide right when ON
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.625rem'
+              }}
+            >
+              {soundEnabled ? '🔊' : '🔇'}
+            </div>
+          </div>
           {soundEnabled && !audioReady && (
-            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-              (click to activate)
+            <span style={{
+              fontSize: '0.75rem',
+              color: 'white',
+              opacity: 0.7,
+              fontStyle: 'italic'
+            }}>
+              Click anywhere to activate
             </span>
           )}
-        </button>
+        </div>
 
         {showSaveIndicator && (
           <div style={{
@@ -625,8 +748,8 @@ const formatReminderTime = (reminder: Reminder) => {
               gap: '0.5rem',
               justifyContent: 'flex-end'
             }}>
-              <button 
-                onClick={() => setActiveNotifications(prev => prev.filter(n => n.id !== notification.id))}
+              <button
+                onClick={() => snoozeNotificationHandler(notification, 10)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -639,6 +762,7 @@ const formatReminderTime = (reminder: Reminder) => {
                   cursor: 'pointer',
                   fontSize: '0.875rem'
                 }}
+                title="Snooze for 10 minutes"
               >
                 <Clock3 size={14} /> 10m
               </button>
