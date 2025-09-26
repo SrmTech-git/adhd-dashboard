@@ -2,12 +2,15 @@
   "name": "adhd-dashboard",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://srmtech-git.github.io/adhd-dashboard",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "generate-sounds": "node scripts/generate-sounds.js"
+    "generate-sounds": "node scripts/generate-sounds.js",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "@types/howler": "^2.2.12",
@@ -24,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
+    "gh-pages": "^6.3.0",
     "typescript": "^5"
   }
 }

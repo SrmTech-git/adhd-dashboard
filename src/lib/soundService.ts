@@ -367,7 +367,7 @@ class SoundService {
       // Try to resume audio context
       if (Howler.ctx && Howler.ctx.state === 'suspended') {
         await Howler.ctx.resume();
-        return Howler.ctx.state === 'running';
+        return Howler.ctx.state !== 'suspended';
       }
       return true;
     } catch (error) {
