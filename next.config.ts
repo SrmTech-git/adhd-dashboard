@@ -38,7 +38,31 @@ const devConfig: NextConfig = {
   images: {
     // Keep image optimization enabled for development
   },
-  // Enable all Next.js features for development
+  // CSP headers for development environment
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://accounts.google.com https://ssl.gstatic.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com",
+              "frame-src 'self' https://accounts.google.com",
+              "img-src 'self' data: blob: https:",
+              "media-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'"
+            ].join('; ')
+          }
+        ]
+      }
+    ];
+  }
 };
 
 // Export the appropriate config based on environment
