@@ -10,7 +10,7 @@
     "lint": "eslint",
     "generate-sounds": "node scripts/generate-sounds.js",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d out"
   },
   "dependencies": {
     "@types/howler": "^2.2.12",

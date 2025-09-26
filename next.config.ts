@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   output: 'export',
   trailingSlash: true,
+  basePath: '/adhd-dashboard',
+  assetPrefix: '/adhd-dashboard/',
   images: {
     unoptimized: true
   },
@@ -14,7 +16,11 @@ const nextConfig: NextConfig = {
   typescript: {
     // Temporarily ignore TypeScript errors during build
     ignoreBuildErrors: true,
+  },
+  // Disable server-side features for static export
+  experimental: {
+    // Ensure no server-side features are used
   }
 };
 
-module.exports = nextConfig;
+export default nextConfig;
