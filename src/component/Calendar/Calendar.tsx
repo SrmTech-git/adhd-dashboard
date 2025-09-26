@@ -2,12 +2,13 @@
 'use client'
 import React, { useState } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Edit2, X } from 'lucide-react';
-import { Event } from '@/types/dashboard';
+import { Event, MoodEntry } from '@/types/dashboard';
 import { monthNames, generateCalendarDays, isToday, formatDateForDisplay } from '@/utils/dateHelpers';
 
 interface CalendarProps {
   events: Event[];
   setEvents: React.Dispatch<React.SetStateAction<Event[]>>;
+  moods: MoodEntry[];
   currentTheme: any;
   isDarkMode: boolean;
 }
@@ -15,6 +16,7 @@ interface CalendarProps {
 const Calendar: React.FC<CalendarProps> = ({
   events,
   setEvents,
+  moods,
   currentTheme,
   isDarkMode
 }) => {
@@ -37,6 +39,23 @@ const Calendar: React.FC<CalendarProps> = ({
     if (!day) return [];
     const dateString = new Date(currentYear, currentMonth, day).toISOString().split('T')[0];
     return events.filter(event => event.date === dateString);
+  };
+
+  const getMoodForDate = (day: number | null) => {
+    if (!day) return null;
+    const dateString = new Date(currentYear, currentMonth, day).toISOString().split('T')[0];
+    return moods.find(mood => mood.date === dateString);
+  };
+
+  const getMoodEmoji = (rating: 1 | 2 | 3 | 4 | 5) => {
+    const moodMap = {
+      1: '😞',
+      2: '😕',
+      3: '😐',
+      4: '🙂',
+      5: '😊'
+    };
+    return moodMap[rating];
   };
 
   const handleDateClick = (day: number | null) => {
@@ -186,9 +205,10 @@ const Calendar: React.FC<CalendarProps> = ({
         
         {generateCalendarDays(currentMonth, currentYear).map((day, index) => {
           const dayEvents = getEventsForDate(day);
+          const dayMood = getMoodForDate(day);
           return (
-            <div 
-              key={index} 
+            <div
+              key={index}
               style={{
                 background: isToday(day, currentMonth, currentYear) ? currentTheme.backgroundHover : currentTheme.cardBackground,
                 minHeight: '100px',
@@ -203,13 +223,23 @@ const Calendar: React.FC<CalendarProps> = ({
             >
               {day && (
                 <>
-                  <span style={{
-                    fontSize: '0.875rem',
-                    color: isToday(day, currentMonth, currentYear) ? currentTheme.primary : currentTheme.textPrimary,
-                    fontWeight: isToday(day, currentMonth, currentYear) ? 'bold' : 500
-                  }}>
-                    {day}
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{
+                      fontSize: '0.875rem',
+                      color: isToday(day, currentMonth, currentYear) ? currentTheme.primary : currentTheme.textPrimary,
+                      fontWeight: isToday(day, currentMonth, currentYear) ? 'bold' : 500
+                    }}>
+                      {day}
+                    </span>
+                    {dayMood && (
+                      <span style={{
+                        fontSize: '0.75rem',
+                        lineHeight: 1
+                      }}>
+                        {getMoodEmoji(dayMood.rating)}
+                      </span>
+                    )}
+                  </div>
                   {dayEvents.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', flex: 1 }}>
                       {dayEvents.length <= 2 ? (

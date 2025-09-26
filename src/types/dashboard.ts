@@ -36,11 +36,18 @@ export interface Notification {
   message: string;
 }
 
+export interface MoodEntry {
+  date: string; // ISO date string like "2024-01-15"
+  rating: 1 | 2 | 3 | 4 | 5; // Bad, Poor, Meh, Good, Great
+  timestamp: string; // ISO timestamp when mood was recorded
+}
+
 export interface DashboardData {
   dailyRoutine: DailyRoutineItem[];
   todos: TodoItem[];
   events: Event[];
   reminders: Reminder[];
+  moods?: MoodEntry[]; // Optional for backward compatibility
   lastResetDate: string;
   soundEnabled: boolean;
   soundVolume?: number; // Optional for backward compatibility

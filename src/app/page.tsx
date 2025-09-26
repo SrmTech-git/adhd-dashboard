@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, Clock, CheckSquare, Square, Plus, X, Play, Pause, RotateCcw, Star, ChevronLeft, ChevronRight, Edit2, Save, Bell, BellOff, Clock3, Coffee } from 'lucide-react';
 import { DataService } from '@/lib/dataService';
 import { theme, getPriorityColor } from '@/lib/theme';
-import { DailyRoutineItem, TodoItem, Event, Reminder, DashboardData } from '@/types/dashboard';
+import { DailyRoutineItem, TodoItem, Event, Reminder, DashboardData, MoodEntry } from '@/types/dashboard';
 import type { Notification } from '@/types/dashboard';
 import { getDefaultDailyRoutine, getDefaultTodos, getDefaultEvents, getDefaultReminders } from '@/utils/defaultData';
 import { monthNames, getDaysInMonth, getFirstDayOfMonth, generateCalendarDays, isToday, formatDateForDisplay, formatTo12Hour } from '@/utils/dateHelpers';
@@ -16,6 +16,7 @@ import TodaysSchedule from '@/component/Schedule/TodaysSchedule';
 import DailyRoutine from '@/component/DailyRoutine/DailyRoutine';
 import TodoList from '@/component/TodoList/TodoList';
 import Reminders from '@/component/Reminders/Reminders';
+import MoodTracker from '@/component/MoodTracker/MoodTracker';
 
 const ADHDDashboard = () => {
   // Get current date for display
@@ -61,6 +62,8 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   const [snoozedNotifications, setSnoozedNotifications] = useState<{id: number, showAt: number, originalNotification: Notification}[]>([]);
   const lastReminderCheck = useRef<number | null>(null);
 
+  // Mood tracking state
+  const [moods, setMoods] = useState<MoodEntry[]>([]);
 
   // Theme system
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -120,6 +123,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
       setTodos(savedData.todos || []);
       setEvents(savedData.events || []);
       setReminders(savedData.reminders || getDefaultReminders());
+      setMoods(savedData.moods || []);
       setSoundEnabled(savedData.soundEnabled !== undefined ? savedData.soundEnabled : true);
       setSoundVolume(savedData.soundVolume !== undefined ? savedData.soundVolume : 0.7);
       setSnoozedNotifications(savedData.snoozedNotifications || []);
@@ -161,6 +165,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         todos,
         events,
         reminders,
+        moods,
         lastResetDate,
         soundEnabled,
         soundVolume,
@@ -175,7 +180,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         setTimeout(() => setShowSaveIndicator(false), 1500);
       }
     }
-  }, [dailyRoutine, todos, events, reminders, lastResetDate, soundEnabled, soundVolume, snoozedNotifications, isDarkMode, isInitialized]);
+  }, [dailyRoutine, todos, events, reminders, moods, lastResetDate, soundEnabled, soundVolume, snoozedNotifications, isDarkMode, isInitialized]);
 
   // Update sound service when sound preferences change
   useEffect(() => {
@@ -851,11 +856,20 @@ const formatReminderTime = (reminder: Reminder) => {
           soundEnabled={soundEnabled}
         />
 
+        {/* Mood Tracker Section */}
+        <MoodTracker
+          moods={moods}
+          setMoods={setMoods}
+          currentTheme={currentTheme}
+          isDarkMode={isDarkMode}
+        />
+
         {/* Calendar Section - Full Width */}
         {/* Calendar Section */}
           <CalendarComponent
             events={events}
             setEvents={setEvents}
+            moods={moods}
             currentTheme={currentTheme}
             isDarkMode={isDarkMode}
           />
