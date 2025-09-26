@@ -1,6 +1,6 @@
 // src/components/TodoList/TodoList.tsx
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Star, CheckSquare, Square, Plus, X } from 'lucide-react';
 import { TodoItem } from '@/types/dashboard';
 import { getPriorityColor } from '@/lib/theme';
@@ -20,6 +20,33 @@ const TodoList: React.FC<TodoListProps> = ({
 }) => {
   const [newTodo, setNewTodo] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+  // Cleanup completed todos at midnight
+  useEffect(() => {
+    const cleanupCompletedTodos = () => {
+      setTodos(prevTodos => prevTodos.filter(todo => !todo.completed));
+    };
+
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0); // Set to midnight
+
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    // Set initial timeout for next midnight
+    const timeoutId = setTimeout(() => {
+      cleanupCompletedTodos();
+
+      // Then set interval for every 24 hours
+      const intervalId = setInterval(cleanupCompletedTodos, 24 * 60 * 60 * 1000);
+
+      // Store interval ID for cleanup
+      return () => clearInterval(intervalId);
+    }, msUntilMidnight);
+
+    return () => clearTimeout(timeoutId);
+  }, [setTodos]);
 
   // Toggle todo item
   const toggleTodo = (id: number) => {
@@ -52,6 +79,7 @@ const TodoList: React.FC<TodoListProps> = ({
       background: currentTheme.cardBackground,
       borderRadius: '1rem',
       padding: '1.5rem',
+      height: '400px', // Fixed height
       boxShadow: isDarkMode ? '0 10px 30px rgba(0, 0, 0, 0.3)' : '0 10px 30px rgba(0, 0, 0, 0.1)',
       display: 'flex',
       flexDirection: 'column'
@@ -71,8 +99,9 @@ const TodoList: React.FC<TodoListProps> = ({
         flexDirection: 'column',
         gap: '0.75rem',
         marginBottom: '1rem',
-        maxHeight: '300px',
-        overflowY: 'auto'
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0 // Important for flex child scrolling
       }}>
         {todos.map(todo => (
           <div key={todo.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -116,7 +145,7 @@ const TodoList: React.FC<TodoListProps> = ({
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: 'auto' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <input
           type="text"
           placeholder="Add new task..."
@@ -133,7 +162,7 @@ const TodoList: React.FC<TodoListProps> = ({
             color: currentTheme.textPrimary
           }}
         />
-        <select 
+        <select
           value={newTodoPriority}
           onChange={(e) => setNewTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
           style={{
@@ -159,6 +188,19 @@ const TodoList: React.FC<TodoListProps> = ({
         }}>
           <Plus size={20} />
         </button>
+      </div>
+      <div style={{
+        height: '0.5rem',
+        background: currentTheme.border,
+        borderRadius: '0.25rem',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          height: '100%',
+          background: currentTheme.success,
+          width: todos.length > 0 ? `${(todos.filter(t => t.completed).length / todos.length) * 100}%` : '0%',
+          transition: 'width 0.3s ease'
+        }} />
       </div>
     </section>
   );

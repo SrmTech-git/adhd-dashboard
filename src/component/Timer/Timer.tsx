@@ -130,7 +130,8 @@ const Timer: React.FC<TimerProps> = ({
       padding: '1.5rem',
       boxShadow: '0 10px 30px rgba(0, 0, 0, 0.1)',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      height: '400px' // Fixed height
     }}>
       <div style={{
         display: 'flex',

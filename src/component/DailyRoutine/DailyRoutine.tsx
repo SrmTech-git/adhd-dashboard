@@ -56,7 +56,8 @@ const DailyRoutine: React.FC<DailyRoutineProps> = ({
       padding: '1.5rem',
       boxShadow: isDarkMode ? '0 10px 30px rgba(0, 0, 0, 0.3)' : '0 10px 30px rgba(0, 0, 0, 0.1)',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      height: '400px' // Fixed height
     }}>
       <div style={{
         display: 'flex',
@@ -83,8 +84,9 @@ const DailyRoutine: React.FC<DailyRoutineProps> = ({
         flexDirection: 'column',
         gap: '0.75rem',
         marginBottom: '1rem',
-        maxHeight: '300px',
-        overflowY: 'auto'
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0 // Important for flex child scrolling
       }}>
         {dailyRoutine.map(task => (
           <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

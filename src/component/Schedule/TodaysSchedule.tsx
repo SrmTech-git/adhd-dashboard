@@ -24,7 +24,8 @@ const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
       padding: '1.5rem',
       boxShadow: isDarkMode ? '0 10px 30px rgba(0, 0, 0, 0.3)' : '0 10px 30px rgba(0, 0, 0, 0.1)',
       display: 'flex',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      height: '400px' // Fixed height
     }}>
       <div style={{
         display: 'flex',
@@ -40,8 +41,9 @@ const TodaysSchedule: React.FC<TodaysScheduleProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '0.75rem',
-        maxHeight: '300px',
-        overflowY: 'auto'
+        flex: 1,
+        overflowY: 'auto',
+        minHeight: 0 // Important for flex child scrolling
       }}>
         {todaysEvents.length > 0 ? (
           todaysEvents.map(event => (
