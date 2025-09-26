@@ -1,15 +1,16 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react';
-import { Calendar, Clock, CheckSquare, Square, Plus, X, Play, Pause, RotateCcw, Star, ChevronLeft, ChevronRight, Edit2, Save, Bell, BellOff, Clock3, Coffee } from 'lucide-react';
+import { Calendar, Clock, CheckSquare, Square, Plus, X, Play, Pause, RotateCcw, Star, ChevronLeft, ChevronRight, Edit2, Save, Bell, BellOff, Clock3, Coffee, Download } from 'lucide-react';
 import { DataService } from '@/lib/dataService';
 import { theme, getPriorityColor } from '@/lib/theme';
-import { DailyRoutineItem, TodoItem, Event, Reminder, DashboardData, MoodEntry } from '@/types/dashboard';
+import { DailyRoutineItem, TodoItem, Event, Reminder, DashboardData, MoodEntry, DailyRoutineHistory, TodoCompletion } from '@/types/dashboard';
 import type { Notification } from '@/types/dashboard';
 import { getDefaultDailyRoutine, getDefaultTodos, getDefaultEvents, getDefaultReminders } from '@/utils/defaultData';
 import { monthNames, getDaysInMonth, getFirstDayOfMonth, generateCalendarDays, isToday, formatDateForDisplay, formatTo12Hour } from '@/utils/dateHelpers';
 import { showNotification, dismissNotification, snoozeNotification, requestNotificationPermission }
 from '@/utils/notificationHelpers';
 import { soundService, SoundType } from '@/lib/soundService';
+import { exportData } from '@/utils/exportHelpers';
 import CalendarComponent from '@/component/Calendar/Calendar';
 import Timer from '@/component/Timer/Timer';
 import TodaysSchedule from '@/component/Schedule/TodaysSchedule';
@@ -65,6 +66,10 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   // Mood tracking state
   const [moods, setMoods] = useState<MoodEntry[]>([]);
 
+  // Historical data state
+  const [dailyRoutineHistory, setDailyRoutineHistory] = useState<DailyRoutineHistory[]>([]);
+  const [todoCompletions, setTodoCompletions] = useState<TodoCompletion[]>([]);
+
   // Theme system
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -81,6 +86,76 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   // Toggle theme
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  const handleExportData = () => {
+    try {
+      const dataToExport: DashboardData = {
+        dailyRoutine,
+        todos,
+        events,
+        reminders,
+        moods,
+        dailyRoutineHistory,
+        todoCompletions,
+        lastResetDate: lastResetDate || new Date().toISOString().split('T')[0],
+        soundEnabled,
+        soundVolume,
+        snoozedNotifications,
+        isDarkMode,
+        lastUpdated: new Date().toISOString()
+      };
+      exportData(dataToExport);
+    } catch (error) {
+      console.error('Export failed:', error);
+      // Show error notification if needed
+    }
+  };
+
+  // Helper function to capture daily routine history before reset
+  const captureDailyRoutineHistory = (routineToCapture: DailyRoutineItem[], dateToCapture: string) => {
+    const completedCount = routineToCapture.filter(item => item.completed).length;
+    const totalCount = routineToCapture.length;
+    const completionRate = totalCount > 0 ? completedCount / totalCount : 0;
+
+    const historyEntry: DailyRoutineHistory = {
+      date: dateToCapture,
+      tasks: [...routineToCapture], // Deep copy
+      completionRate,
+      completedCount,
+      totalCount
+    };
+
+    setDailyRoutineHistory(prev => {
+      // Keep only last 90 days to prevent infinite growth
+      const updatedHistory = [...prev, historyEntry]
+        .sort((a, b) => b.date.localeCompare(a.date)) // Sort by date descending
+        .slice(0, 90); // Keep last 90 entries
+      return updatedHistory;
+    });
+  };
+
+  // Helper function to handle todo completion
+  const handleTodoCompletion = (todo: TodoItem) => {
+    const now = new Date();
+    const completion: TodoCompletion = {
+      id: todo.id,
+      text: todo.text,
+      priority: todo.priority,
+      completedAt: now.toISOString(),
+      completedDate: now.toISOString().split('T')[0]
+    };
+
+    setTodoCompletions(prev => {
+      // Keep only last 90 days to prevent infinite growth
+      const updatedCompletions = [...prev, completion]
+        .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+        .slice(0, 300); // Keep last 300 completions (roughly 90 days of active usage)
+      return updatedCompletions;
+    });
+
+    // Remove from current todos
+    setTodos(todos.filter(t => t.id !== todo.id));
   };
 
   // Handle snoozing notifications
@@ -124,6 +199,8 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
       setEvents(savedData.events || []);
       setReminders(savedData.reminders || getDefaultReminders());
       setMoods(savedData.moods || []);
+      setDailyRoutineHistory(savedData.dailyRoutineHistory || []);
+      setTodoCompletions(savedData.todoCompletions || []);
       setSoundEnabled(savedData.soundEnabled !== undefined ? savedData.soundEnabled : true);
       setSoundVolume(savedData.soundVolume !== undefined ? savedData.soundVolume : 0.7);
       setSnoozedNotifications(savedData.snoozedNotifications || []);
@@ -131,7 +208,10 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
       
       // Handle daily routine reset
       if (savedData.lastResetDate !== todayKey && savedData.dailyRoutine) {
-        // It's a new day - reset completion status but keep the items
+        // It's a new day - capture yesterday's data before resetting
+        captureDailyRoutineHistory(savedData.dailyRoutine, savedData.lastResetDate);
+
+        // Reset completion status but keep the items
         const resetRoutine = savedData.dailyRoutine.map((item: DailyRoutineItem) => ({
           ...item,
           completed: false
@@ -166,6 +246,8 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         events,
         reminders,
         moods,
+        dailyRoutineHistory,
+        todoCompletions,
         lastResetDate,
         soundEnabled,
         soundVolume,
@@ -180,7 +262,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
         setTimeout(() => setShowSaveIndicator(false), 1500);
       }
     }
-  }, [dailyRoutine, todos, events, reminders, moods, lastResetDate, soundEnabled, soundVolume, snoozedNotifications, isDarkMode, isInitialized]);
+  }, [dailyRoutine, todos, events, reminders, moods, dailyRoutineHistory, todoCompletions, lastResetDate, soundEnabled, soundVolume, snoozedNotifications, isDarkMode, isInitialized]);
 
   // Update sound service when sound preferences change
   useEffect(() => {
@@ -695,6 +777,50 @@ const formatReminderTime = (reminder: Reminder) => {
           )}
         </div>
 
+        {/* Export Data Button */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '5rem',
+            left: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <button
+            onClick={handleExportData}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 1rem',
+              background: 'rgba(59, 130, 246, 0.8)', // Blue background
+              color: 'white',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '0.75rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              transition: 'all 0.3s ease',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.9)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.8)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            title="Export dashboard data as JSON and CSV files"
+          >
+            <Download size={16} />
+            <span>📊 Export Data</span>
+          </button>
+        </div>
+
         {showSaveIndicator && (
           <div style={{
             position: 'absolute',
@@ -818,6 +944,7 @@ const formatReminderTime = (reminder: Reminder) => {
           <TodoList
             todos={todos}
             setTodos={setTodos}
+            onTodoComplete={handleTodoCompletion}
             currentTheme={currentTheme}
             isDarkMode={isDarkMode}
           />

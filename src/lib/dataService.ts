@@ -1,5 +1,5 @@
 // src/lib/dataService.ts
-import { DashboardData } from '@/types/dashboard';
+import { DashboardData, GoogleCalendarData, GoogleCalendarAuth } from '@/types/dashboard';
 
 // Data Service Layer - Easy to replace with API calls later
 export const DataService = {
@@ -45,5 +45,102 @@ updateEntity: (entityType: keyof DashboardData, entityId: number, updates: any) 
   // Get today's date key for daily resets
   getTodayKey: () => {
     return new Date().toISOString().split('T')[0];
+  },
+
+  // Google Calendar specific methods
+  saveGoogleCalendarAuth: (auth: GoogleCalendarAuth) => {
+    const data = DataService.loadUserData();
+    if (data) {
+      if (!data.googleCalendar) {
+        data.googleCalendar = {
+          auth: auth,
+          events: [],
+          lastFetch: null,
+          error: null
+        };
+      } else {
+        data.googleCalendar.auth = auth;
+      }
+      return DataService.saveUserData(data);
+    }
+    return false;
+  },
+
+  saveGoogleCalendarEvents: (events: any[], error: string | null = null) => {
+    const data = DataService.loadUserData();
+    if (data) {
+      if (!data.googleCalendar) {
+        data.googleCalendar = {
+          auth: {
+            isConnected: false,
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiry: null,
+            userEmail: null,
+            lastSync: null
+          },
+          events: [],
+          lastFetch: null,
+          error: null
+        };
+      }
+
+      data.googleCalendar.events = events;
+      data.googleCalendar.lastFetch = new Date().toISOString();
+      data.googleCalendar.error = error;
+
+      return DataService.saveUserData(data);
+    }
+    return false;
+  },
+
+  getGoogleCalendarData: (): GoogleCalendarData | null => {
+    const data = DataService.loadUserData();
+    return data?.googleCalendar || null;
+  },
+
+  clearGoogleCalendarData: () => {
+    const data = DataService.loadUserData();
+    if (data) {
+      data.googleCalendar = {
+        auth: {
+          isConnected: false,
+          accessToken: null,
+          refreshToken: null,
+          tokenExpiry: null,
+          userEmail: null,
+          lastSync: null
+        },
+        events: [],
+        lastFetch: null,
+        error: null
+      };
+      return DataService.saveUserData(data);
+    }
+    return false;
+  },
+
+  setGoogleCalendarError: (error: string) => {
+    const data = DataService.loadUserData();
+    if (data) {
+      if (!data.googleCalendar) {
+        data.googleCalendar = {
+          auth: {
+            isConnected: false,
+            accessToken: null,
+            refreshToken: null,
+            tokenExpiry: null,
+            userEmail: null,
+            lastSync: null
+          },
+          events: [],
+          lastFetch: null,
+          error: null
+        };
+      }
+      data.googleCalendar.error = error;
+      return DataService.saveUserData(data);
+    }
+    return false;
   }
 };

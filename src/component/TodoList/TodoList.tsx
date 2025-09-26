@@ -8,6 +8,7 @@ import { getPriorityColor } from '@/lib/theme';
 interface TodoListProps {
   todos: TodoItem[];
   setTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>;
+  onTodoComplete?: (todo: TodoItem) => void;
   currentTheme: any;
   isDarkMode: boolean;
 }
@@ -15,44 +16,30 @@ interface TodoListProps {
 const TodoList: React.FC<TodoListProps> = ({
   todos,
   setTodos,
+  onTodoComplete,
   currentTheme,
   isDarkMode
 }) => {
   const [newTodo, setNewTodo] = useState('');
   const [newTodoPriority, setNewTodoPriority] = useState<'low' | 'medium' | 'high'>('medium');
 
-  // Cleanup completed todos at midnight
-  useEffect(() => {
-    const cleanupCompletedTodos = () => {
-      setTodos(prevTodos => prevTodos.filter(todo => !todo.completed));
-    };
-
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0); // Set to midnight
-
-    const msUntilMidnight = tomorrow.getTime() - now.getTime();
-
-    // Set initial timeout for next midnight
-    const timeoutId = setTimeout(() => {
-      cleanupCompletedTodos();
-
-      // Then set interval for every 24 hours
-      const intervalId = setInterval(cleanupCompletedTodos, 24 * 60 * 60 * 1000);
-
-      // Store interval ID for cleanup
-      return () => clearInterval(intervalId);
-    }, msUntilMidnight);
-
-    return () => clearTimeout(timeoutId);
-  }, [setTodos]);
+  // Note: Completed todos are now handled by the parent component's
+  // historical tracking system and are removed immediately upon completion
 
   // Toggle todo item
   const toggleTodo = (id: number) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ));
+    const todo = todos.find(t => t.id === id);
+    if (!todo) return;
+
+    if (!todo.completed && onTodoComplete) {
+      // About to mark as complete - use the completion handler
+      onTodoComplete(todo);
+    } else {
+      // Toggling from complete to incomplete or no handler provided
+      setTodos(todos.map(t =>
+        t.id === id ? { ...t, completed: !t.completed } : t
+      ));
+    }
   };
 
   // Add new todo

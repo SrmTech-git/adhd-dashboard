@@ -1,9 +1,11 @@
 // src/components/Calendar/Calendar.tsx
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Edit2, X } from 'lucide-react';
 import { Event, MoodEntry } from '@/types/dashboard';
 import { monthNames, generateCalendarDays, isToday, formatDateForDisplay } from '@/utils/dateHelpers';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import GoogleCalendarConnection from '@/component/GoogleCalendar/GoogleCalendarConnection';
 
 interface CalendarProps {
   events: Event[];
@@ -30,15 +32,40 @@ const Calendar: React.FC<CalendarProps> = ({
   const [newEventTime, setNewEventTime] = useState('');
   const [newEventTitle, setNewEventTitle] = useState('');
 
-  // Get selected date events
-  const selectedDateEvents = selectedDate 
-    ? events.filter(event => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
+  // Google Calendar integration
+  const { events: googleEvents } = useGoogleCalendar();
+
+  // Merge local and Google events
+  const allEvents = useMemo(() => {
+    const localEventsWithSource = events.map(event => ({
+      ...event,
+      source: 'local' as const
+    }));
+
+    return [...localEventsWithSource, ...googleEvents]
+      .sort((a, b) => {
+        // Sort by date first, then by time
+        const dateCompare = a.date.localeCompare(b.date);
+        if (dateCompare !== 0) return dateCompare;
+
+        // Handle "All day" events - put them first
+        if (a.time === 'All day' && b.time !== 'All day') return -1;
+        if (b.time === 'All day' && a.time !== 'All day') return 1;
+        if (a.time === 'All day' && b.time === 'All day') return 0;
+
+        return a.time.localeCompare(b.time);
+      });
+  }, [events, googleEvents]);
+
+  // Get selected date events (both local and Google)
+  const selectedDateEvents = selectedDate
+    ? allEvents.filter(event => event.date === selectedDate)
     : [];
 
   const getEventsForDate = (day: number | null) => {
     if (!day) return [];
     const dateString = new Date(currentYear, currentMonth, day).toISOString().split('T')[0];
-    return events.filter(event => event.date === dateString);
+    return allEvents.filter(event => event.date === dateString);
   };
 
   const getMoodForDate = (day: number | null) => {
@@ -86,29 +113,32 @@ const Calendar: React.FC<CalendarProps> = ({
     }
   };
 
-  // Add or update event
+  // Add or update event (only for local events)
   const saveEvent = () => {
     if (!newEventTime || !newEventTitle.trim()) return;
 
     if (editingEvent) {
-      // Update existing event
-      setEvents(events.map(event => 
-        event.id === editingEvent.id 
-          ? { ...event, time: newEventTime, title: newEventTitle }
-          : event
-      ));
+      // Only allow editing local events
+      if (editingEvent.source === 'local') {
+        setEvents(events.map(event =>
+          event.id === editingEvent.id
+            ? { ...event, time: newEventTime, title: newEventTitle }
+            : event
+        ));
+      }
     } else {
-      // Add new event
-      const newId = events.length > 0 ? Math.max(...events.map(e => e.id)) + 1 : 1;
+      // Add new event (always local)
+      const newId = allEvents.length > 0 ? Math.max(...allEvents.map(e => e.id)) + 1 : 1;
       const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      
+
       setEvents([...events, {
         id: newId,
         date: selectedDate!,
         time: newEventTime,
         title: newEventTitle,
-        color: randomColor
+        color: randomColor,
+        source: 'local'
       }]);
     }
 
@@ -118,20 +148,25 @@ const Calendar: React.FC<CalendarProps> = ({
     setEditingEvent(null);
   };
 
-  // Start editing an event
+  // Start editing an event (only local events)
   const startEditingEvent = (event: Event) => {
-    setEditingEvent(event);
-    setNewEventTime(event.time);
-    setNewEventTitle(event.title);
+    if (event.source === 'local') {
+      setEditingEvent(event);
+      setNewEventTime(event.time);
+      setNewEventTitle(event.title);
+    }
   };
 
-  // Remove event
+  // Remove event (only local events)
   const removeEvent = (id: number) => {
-    setEvents(events.filter(event => event.id !== id));
-    if (editingEvent && editingEvent.id === id) {
-      setEditingEvent(null);
-      setNewEventTime('');
-      setNewEventTitle('');
+    const eventToRemove = allEvents.find(e => e.id === id);
+    if (eventToRemove?.source === 'local') {
+      setEvents(events.filter(event => event.id !== id));
+      if (editingEvent && editingEvent.id === id) {
+        setEditingEvent(null);
+        setNewEventTime('');
+        setNewEventTitle('');
+      }
     }
   };
 
@@ -145,6 +180,12 @@ const Calendar: React.FC<CalendarProps> = ({
       display: 'flex',
       flexDirection: 'column'
     }}>
+      {/* Google Calendar Connection */}
+      <GoogleCalendarConnection
+        currentTheme={currentTheme}
+        isDarkMode={isDarkMode}
+      />
+
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -244,8 +285,8 @@ const Calendar: React.FC<CalendarProps> = ({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', flex: 1 }}>
                       {dayEvents.length <= 2 ? (
                         dayEvents.map((event, i) => (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             style={{
                               fontSize: '0.7rem',
                               padding: '0.125rem 0.25rem',
@@ -254,15 +295,25 @@ const Calendar: React.FC<CalendarProps> = ({
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              backgroundColor: event.color
+                              backgroundColor: event.color,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
                             }}
                           >
-                            {event.title}
+                            <span style={{ flex: 1 }}>{event.title}</span>
+                            {event.source === 'google' && (
+                              <span style={{
+                                fontSize: '0.6rem',
+                                opacity: 0.8,
+                                fontWeight: 'bold'
+                              }}>G</span>
+                            )}
                           </div>
                         ))
                       ) : (
                         <>
-                          <div 
+                          <div
                             style={{
                               fontSize: '0.7rem',
                               padding: '0.125rem 0.25rem',
@@ -271,10 +322,20 @@ const Calendar: React.FC<CalendarProps> = ({
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              backgroundColor: dayEvents[0].color
+                              backgroundColor: dayEvents[0].color,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
                             }}
                           >
-                            {dayEvents[0].title}
+                            <span style={{ flex: 1 }}>{dayEvents[0].title}</span>
+                            {dayEvents[0].source === 'google' && (
+                              <span style={{
+                                fontSize: '0.6rem',
+                                opacity: 0.8,
+                                fontWeight: 'bold'
+                              }}>G</span>
+                            )}
                           </div>
                           <div style={{
                             fontSize: '0.7rem',
@@ -357,7 +418,8 @@ const Calendar: React.FC<CalendarProps> = ({
                     gap: '0.75rem',
                     padding: '0.75rem',
                     background: currentTheme.backgroundMuted,
-                    borderRadius: '0.5rem'
+                    borderRadius: '0.5rem',
+                    border: event.source === 'google' ? '1px solid rgba(66, 133, 244, 0.3)' : 'none'
                   }}>
                     <div style={{
                       width: '4px',
@@ -366,36 +428,66 @@ const Calendar: React.FC<CalendarProps> = ({
                       backgroundColor: event.color
                     }} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '0.875rem', color: currentTheme.textSecondary }}>{event.time}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', color: currentTheme.textSecondary }}>{event.time}</span>
+                        {event.source === 'google' && (
+                          <span style={{
+                            fontSize: '0.75rem',
+                            color: '#4285F4',
+                            background: 'rgba(66, 133, 244, 0.1)',
+                            padding: '0.125rem 0.375rem',
+                            borderRadius: '0.75rem',
+                            fontWeight: '500'
+                          }}>
+                            Google
+                          </span>
+                        )}
+                      </div>
                       <span style={{ fontWeight: 500, color: currentTheme.textPrimary }}>{event.title}</span>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button 
-                        onClick={() => startEditingEvent(event)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: currentTheme.primary,
-                          cursor: 'pointer',
-                          padding: '0.5rem',
-                          borderRadius: '0.25rem'
-                        }}
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => removeEvent(event.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
+                      {event.source === 'local' && (
+                        <>
+                          <button
+                            onClick={() => startEditingEvent(event)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: currentTheme.primary,
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '0.25rem'
+                            }}
+                            title="Edit event"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => removeEvent(event.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: currentTheme.textMuted,
+                              cursor: 'pointer',
+                              padding: '0.25rem',
+                              borderRadius: '0.25rem'
+                            }}
+                            title="Delete event"
+                          >
+                            <X size={16} />
+                          </button>
+                        </>
+                      )}
+                      {event.source === 'google' && (
+                        <span style={{
+                          fontSize: '0.75rem',
                           color: currentTheme.textMuted,
-                          cursor: 'pointer',
-                          padding: '0.25rem',
-                          borderRadius: '0.25rem'
-                        }}
-                      >
-                        <X size={16} />
-                      </button>
+                          padding: '0.5rem',
+                          fontStyle: 'italic'
+                        }}>
+                          Read-only
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -404,9 +496,19 @@ const Calendar: React.FC<CalendarProps> = ({
 
             {/* Add/Edit event form */}
             <div style={{ padding: '1.5rem', borderTop: `1px solid ${currentTheme.border}` }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: currentTheme.textPrimary }}>
-                {editingEvent ? 'Edit Event' : 'Add New Event'}
+              <h4 style={{ margin: '0 0 0.5rem 0', color: currentTheme.textPrimary }}>
+                {editingEvent ? 'Edit Local Event' : 'Add New Local Event'}
               </h4>
+              {!editingEvent && (
+                <p style={{
+                  fontSize: '0.875rem',
+                  color: currentTheme.textSecondary,
+                  margin: '0 0 1rem 0',
+                  lineHeight: '1.4'
+                }}>
+                  Local events can be edited and deleted. Google Calendar events are read-only.
+                </p>
+              )}
               <input
                 type="text"
                 placeholder="Time (e.g., 3:00 PM)"
