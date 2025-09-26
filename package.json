@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
+    "build:static": "cross-env BUILD_STATIC=true next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "generate-sounds": "node scripts/generate-sounds.js",
-    "predeploy": "npm run build",
+    "predeploy": "npm run build:static",
     "deploy": "gh-pages -d out"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "gh-pages": "^6.3.0",

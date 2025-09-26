@@ -23,8 +23,8 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Build application
-      run: npm run build
+    - name: Build application for static export
+      run: npm run build:static
 
     - name: Add .nojekyll file
       run: touch out/.nojekyll
