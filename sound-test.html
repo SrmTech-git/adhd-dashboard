@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sound System Test - ADHD Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 1rem;
+        }
+        .sound-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .sound-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .sound-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .sound-button:active {
+            transform: translateY(0);
+        }
+        .category {
+            margin: 2rem 0;
+        }
+        .category h3 {
+            margin-bottom: 1rem;
+            color: #fff;
+            opacity: 0.9;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 ADHD Dashboard Sound Test</h1>
+        <p>Click the buttons below to test each generated sound file. These sounds are now integrated into your dashboard!</p>
+
+        <div class="info">
+            <strong>🎧 Listening Tips:</strong>
+            <ul>
+                <li>Make sure your volume is at a comfortable level</li>
+                <li>These sounds are designed to be gentle and non-startling</li>
+                <li>If you don't hear anything, check your browser's audio permissions</li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <h3>⏱️ Timer Sounds</h3>
+            <div class="sound-grid">
+                <button class="sound-button" onclick="playSound('timer-start')">
+                    ▶️ Timer Start<br>
+                    <small>Gentle chime when starting focus</small>
+                </button>
+                <button class="sound-button" onclick="playSound('timer-pause')">
+                    ⏸️ Timer Pause<br>
+                    <small>Soft descending tone</small>
+                </button>
+                <button class="sound-button" onclick="playSound('timer-reset')">
+                    🔄 Timer Reset<br>
+                    <small>Quick soft beep</small>
+                </button>
+                <button class="sound-button" onclick="playSound('timer-complete')">
+                    🎉 Timer Complete<br>
+                    <small>Pleasant ascending chimes</small>
+                </button>
+            </div>
+        </div>
+
+        <div class="category">
+            <h3>🔔 Reminder Sounds</h3>
+            <div class="sound-grid">
+                <button class="sound-button" onclick="playSound('reminder-gentle')">
+                    💜 Gentle Reminder<br>
+                    <small>Soft bell-like chime</small>
+                </button>
+                <button class="sound-button" onclick="playSound('reminder-urgent')">
+                    ⚡ Urgent Reminder<br>
+                    <small>More prominent but still gentle</small>
+                </button>
+            </div>
+        </div>
+
+        <div class="category">
+            <h3>📅 Event & Feedback Sounds</h3>
+            <div class="sound-grid">
+                <button class="sound-button" onclick="playSound('event-warning')">
+                    📅 Event Warning<br>
+                    <small>15-minute event alert</small>
+                </button>
+                <button class="sound-button" onclick="playSound('success')">
+                    ✅ Success<br>
+                    <small>Pleasant upward sequence</small>
+                </button>
+                <button class="sound-button" onclick="playSound('task-complete')">
+                    🎯 Task Complete<br>
+                    <small>Completion chime</small>
+                </button>
+                <button class="sound-button" onclick="playSound('error')">
+                    ⚠️ Error/Delete<br>
+                    <small>Gentle descending tone</small>
+                </button>
+            </div>
+        </div>
+
+        <div class="info">
+            <strong>✨ Integration Status:</strong><br>
+            These sounds are now fully integrated into your ADHD Dashboard:
+            <ul>
+                <li><strong>Timer:</strong> Plays sounds for start, pause, reset, and completion</li>
+                <li><strong>Reminders:</strong> Gentle chimes for notifications</li>
+                <li><strong>Events:</strong> 15-minute warning alerts</li>
+                <li><strong>Interactions:</strong> Feedback for saving, deleting, etc.</li>
+            </ul>
+        </div>
+
+        <div class="category">
+            <h3>🎛️ Volume Test</h3>
+            <input type="range" id="volumeSlider" min="0" max="100" value="70"
+                   oninput="updateVolume(this.value)" style="width: 100%; margin: 1rem 0;">
+            <p>Current Volume: <span id="volumeDisplay">70%</span></p>
+        </div>
+    </div>
+
+    <script>
+        let currentVolume = 0.7;
+
+        function playSound(soundName) {
+            const audio = new Audio(`/sounds/${soundName}.wav`);
+            audio.volume = currentVolume;
+
+            audio.play().catch(error => {
+                console.error('Error playing sound:', error);
+                alert(`Error playing ${soundName}: ${error.message}\nTry clicking the page first to enable audio.`);
+            });
+
+            // Visual feedback
+            const button = event.target;
+            const originalBg = button.style.background;
+            button.style.background = 'rgba(255, 255, 255, 0.4)';
+            setTimeout(() => {
+                button.style.background = originalBg;
+            }, 200);
+        }
+
+        function updateVolume(value) {
+            currentVolume = value / 100;
+            document.getElementById('volumeDisplay').textContent = value + '%';
+        }
+
+        // Enable audio on first user interaction
+        document.addEventListener('click', function enableAudio() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioContext.resume().then(() => {
+                console.log('Audio context enabled');
+            });
+            document.removeEventListener('click', enableAudio);
+        }, { once: true });
+    </script>
+</body>
+</html>
