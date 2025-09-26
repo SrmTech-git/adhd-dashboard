@@ -9,7 +9,7 @@ GitHub Pages static hosting blocks Google APIs due to default Content Security P
 If you use a custom domain with Cloudflare, you can set CSP headers:
 
 ```
-Content-Security-Policy: default-src 'self' https://srmtech-git.github.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://accounts.google.com https://ssl.gstatic.com https://srmtech-git.github.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://srmtech-git.github.io; font-src 'self' https://fonts.gstatic.com https://srmtech-git.github.io; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://srmtech-git.github.io; frame-src 'self' https://accounts.google.com; img-src 'self' data: blob: https: https://srmtech-git.github.io; media-src 'self' https://srmtech-git.github.io; object-src 'none'; base-uri 'self'
+Content-Security-Policy: default-src 'self' https://srmtech-git.github.io; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com https://accounts.google.com https://ssl.gstatic.com https://srmtech-git.github.io; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://srmtech-git.github.io; font-src 'self' https://fonts.gstatic.com https://srmtech-git.github.io; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://srmtech-git.github.io; frame-src 'self' https://accounts.google.com https://content.googleapis.com; img-src 'self' data: blob: https: https://srmtech-git.github.io; media-src 'self' https://srmtech-git.github.io; object-src 'none'; base-uri 'self'
 ```
 
 ### Option 2: Client-Side CSP Override (Current Implementation)

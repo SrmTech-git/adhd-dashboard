@@ -13,7 +13,7 @@ export const enableGoogleAPIsCSP = () => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://srmtech-git.github.io",
     "font-src 'self' https://fonts.gstatic.com https://srmtech-git.github.io",
     "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://srmtech-git.github.io",
-    "frame-src 'self' https://accounts.google.com",
+    "frame-src 'self' https://accounts.google.com https://content.googleapis.com",
     "img-src 'self' data: blob: https: https://srmtech-git.github.io",
     "media-src 'self' https://srmtech-git.github.io",
     "object-src 'none'",

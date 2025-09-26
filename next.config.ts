@@ -52,7 +52,7 @@ const devConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com",
-              "frame-src 'self' https://accounts.google.com",
+              "frame-src 'self' https://accounts.google.com https://content.googleapis.com",
               "img-src 'self' data: blob: https:",
               "media-src 'self'",
               "object-src 'none'",
