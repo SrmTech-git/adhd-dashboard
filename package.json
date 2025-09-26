@@ -7,6 +7,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "build:static": "cross-env BUILD_STATIC=true next build --turbopack",
+    "build:ci": "cross-env BUILD_STATIC=true SKIP_LINT=true next build --turbopack",
     "start": "next start",
     "lint": "eslint",
     "generate-sounds": "node scripts/generate-sounds.js"

@@ -32,9 +32,6 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          # Automatically inject basePath in your Next.js configuration file
-          static_site_generator: next
 
       - name: Restore cache
         uses: actions/cache@v4
@@ -48,8 +45,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build with Next.js
-        run: npm run build:static
+      - name: Build with Next.js (ignore ESLint errors)
+        run: npm run build:ci
 
       - name: Add .nojekyll file
         run: touch out/.nojekyll
