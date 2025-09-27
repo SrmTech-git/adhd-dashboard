@@ -150,6 +150,7 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
 
       // Update state
       setEvents(fetchedEvents);
+      // Force component re-render
       setLastSync(new Date().toISOString());
 
       // Update auth with new sync time
