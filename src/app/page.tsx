@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Calendar, Clock, CheckSquare, Square, Plus, X, Play, Pause, RotateCcw, Star, ChevronLeft, ChevronRight, Edit2, Save, Bell, BellOff, Clock3, Coffee, Download } from 'lucide-react';
 import { DataService } from '@/lib/dataService';
 import { theme, getPriorityColor } from '@/lib/theme';
@@ -18,16 +18,20 @@ import DailyRoutine from '@/component/DailyRoutine/DailyRoutine';
 import TodoList from '@/component/TodoList/TodoList';
 import Reminders from '@/component/Reminders/Reminders';
 import MoodTracker from '@/component/MoodTracker/MoodTracker';
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 
 const ADHDDashboard = () => {
   // Get current date for display
   const today = new Date();
-  const todayString = today.toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  const todayString = today.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   });
+
+  // Google Calendar integration
+  const { events: googleEvents } = useGoogleCalendar();
 
   // State for save indicator
   const [showSaveIndicator, setShowSaveIndicator] = useState(false);
@@ -82,6 +86,11 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   const [audioReady, setAudioReady] = useState(false);
 
   const currentTheme = isDarkMode ? theme.dark : theme.light;
+
+  // Merge local events with Google Calendar events
+  const allEvents = useMemo(() => {
+    return [...events, ...googleEvents];
+  }, [events, googleEvents]);
 
   // Toggle theme
   const toggleTheme = () => {
@@ -337,14 +346,14 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
 
 
 
-  // Get today's events
-  const todaysEvents = events
+  // Get today's events (merged local + Google events)
+  const todaysEvents = allEvents
     .filter(event => event.date === today.toISOString().split('T')[0])
     .sort((a, b) => a.time.localeCompare(b.time));
 
-  // Get selected date events
-  const selectedDateEvents = selectedDate 
-    ? events.filter(event => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
+  // Get selected date events (merged local + Google events)
+  const selectedDateEvents = selectedDate
+    ? allEvents.filter(event => event.date === selectedDate).sort((a, b) => a.time.localeCompare(b.time))
     : [];
 
   // Check for due reminders and upcoming events
@@ -459,7 +468,7 @@ const [activeNotifications, setActiveNotifications] = useState<Notification[]>([
   const getEventsForDate = (day: number | null) => {
     if (!day) return [];
     const dateString = new Date(currentYear, currentMonth, day).toISOString().split('T')[0];
-    return events.filter(event => event.date === dateString);
+    return allEvents.filter(event => event.date === dateString);
   };
 
   const handleDateClick = (day: number | null) => {
@@ -994,7 +1003,7 @@ const formatReminderTime = (reminder: Reminder) => {
         {/* Calendar Section - Full Width */}
         {/* Calendar Section */}
           <CalendarComponent
-            events={events}
+            events={allEvents}
             setEvents={setEvents}
             moods={moods}
             currentTheme={currentTheme}

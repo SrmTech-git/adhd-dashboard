@@ -208,10 +208,13 @@ class GoogleCalendarService {
         throw new Error('Invalid or expired access token');
       }
 
-      // Ensure the token is set for API calls
-      window.gapi.client.setToken({
-        access_token: auth.accessToken
-      });
+      // Set the access token safely
+      if (window.gapi && window.gapi.client && window.gapi.client.setToken) {
+        window.gapi.client.setToken({ access_token: auth.accessToken });
+      } else {
+        console.error('gapi.client.setToken not available');
+        throw new Error('Google API client not properly initialized');
+      }
 
       const now = new Date();
       const futureDate = new Date();

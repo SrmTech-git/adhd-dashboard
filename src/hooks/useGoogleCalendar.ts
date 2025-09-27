@@ -40,9 +40,13 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
 
           // Check if user is still signed in to Google
           if (savedData.auth.isConnected) {
-            const stillSignedIn = await googleCalendarService.isSignedIn();
-            if (!stillSignedIn) {
-              // User is no longer signed in, clear the connection
+            // Verify the token is still valid
+            if (savedData.auth.tokenExpiry && Date.now() < savedData.auth.tokenExpiry) {
+              // Token is still valid, restore the session
+              console.log('✅ Restoring valid Google Calendar session');
+            } else {
+              // Token expired, clear the connection
+              console.log('❌ Google Calendar token expired, clearing connection');
               await disconnect();
             }
           }
