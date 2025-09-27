@@ -226,9 +226,17 @@ class GoogleCalendarService {
         orderBy: 'startTime'
       });
 
+      console.log('Raw Google Calendar API response:', response.result);
+
       const events: GoogleCalendarEvent[] = response.result.items || [];
 
-      return events.map((event) => this.convertGoogleEventToLocal(event));
+      console.log('Parsed events from Google:', events);
+
+      const convertedEvents = events.map((event) => this.convertGoogleEventToLocal(event));
+
+      console.log('Converted events for dashboard:', convertedEvents);
+
+      return convertedEvents;
     } catch (error) {
       console.error('Failed to fetch Google Calendar events:', error);
       throw error;
