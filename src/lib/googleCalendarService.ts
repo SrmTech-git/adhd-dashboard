@@ -241,7 +241,7 @@ class GoogleCalendarService {
 
       const events: GoogleCalendarEvent[] = response.result.items || [];
 
-      return events.map(this.convertGoogleEventToLocal);
+      return events.map((event) => this.convertGoogleEventToLocal(event));
     } catch (error) {
       console.error('Failed to fetch Google Calendar events:', error);
       throw error;
