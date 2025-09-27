@@ -30,6 +30,8 @@ class GoogleCalendarService {
 
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
+  private tokenClient: any = null;
+  private currentAccessToken: string | null = null;
 
   constructor() {
     // Only initialize on client side
@@ -47,16 +49,22 @@ class GoogleCalendarService {
       // Wait for Google APIs to load
       await this.waitForGoogleAPIs();
 
-      // Initialize gapi
+      // Initialize gapi client (without auth2)
       await new Promise<void>((resolve, reject) => {
-        window.gapi.load('auth2:client', {
+        window.gapi.load('client', {
           callback: () => {
             window.gapi.client.init({
-              discoveryDocs: [this.discoveryUrl],
-              clientId: this.clientId,
-              scope: this.scope
+              discoveryDocs: [this.discoveryUrl]
             }).then(() => {
+              // Initialize Google Identity Services token client
+              this.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: this.clientId,
+                scope: this.scope,
+                callback: '', // Will be set dynamically in signIn()
+              });
+
               this.isInitialized = true;
+              console.log('✅ Google Calendar service initialized with GIS');
               resolve();
             }).catch(reject);
           },
@@ -101,27 +109,59 @@ class GoogleCalendarService {
 
     await this.initPromise;
 
+    if (!this.tokenClient) {
+      throw new Error('Token client not initialized');
+    }
+
     try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      const user = await authInstance.signIn();
+      return new Promise<GoogleCalendarAuth>((resolve, reject) => {
+        // Set callback for this specific sign-in request
+        this.tokenClient.callback = (response: any) => {
+          if (response.error) {
+            console.error('Google Calendar sign-in failed:', response.error);
+            reject(new Error(response.error));
+            return;
+          }
 
-      if (!user.isSignedIn()) {
-        throw new Error('User authentication failed');
-      }
+          // Store access token for API calls
+          this.currentAccessToken = response.access_token;
+          window.gapi.client.setToken({
+            access_token: response.access_token
+          });
 
-      const authResponse = user.getAuthResponse();
-      const profile = user.getBasicProfile();
+          // Calculate token expiry (GIS doesn't provide exact expiry, typically 1 hour)
+          const expiryTime = Date.now() + (response.expires_in ? response.expires_in * 1000 : 3600000);
 
-      const auth: GoogleCalendarAuth = {
-        isConnected: true,
-        accessToken: authResponse.access_token,
-        refreshToken: null, // Not available in client-side OAuth
-        tokenExpiry: authResponse.expires_at,
-        userEmail: profile.getEmail(),
-        lastSync: new Date().toISOString()
-      };
+          // Get user info from the token (we'll need to make an API call for this)
+          this.getUserEmailFromAPI().then(userEmail => {
+            const auth: GoogleCalendarAuth = {
+              isConnected: true,
+              accessToken: response.access_token,
+              refreshToken: null, // Not available in client-side OAuth
+              tokenExpiry: expiryTime,
+              userEmail: userEmail || 'unknown@example.com',
+              lastSync: new Date().toISOString()
+            };
 
-      return auth;
+            console.log('✅ Google Calendar sign-in successful');
+            resolve(auth);
+          }).catch(error => {
+            console.warn('Failed to get user email, using placeholder:', error);
+            const auth: GoogleCalendarAuth = {
+              isConnected: true,
+              accessToken: response.access_token,
+              refreshToken: null,
+              tokenExpiry: expiryTime,
+              userEmail: 'unknown@example.com',
+              lastSync: new Date().toISOString()
+            };
+            resolve(auth);
+          });
+        };
+
+        // Request access token
+        this.tokenClient.requestAccessToken({ prompt: 'consent' });
+      });
     } catch (error) {
       console.error('Google Calendar sign-in failed:', error);
       throw error;
@@ -131,11 +171,19 @@ class GoogleCalendarService {
   async signOut(): Promise<void> {
     if (typeof window === 'undefined') return;
 
-    await this.initPromise;
-
     try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      await authInstance.signOut();
+      // Revoke the access token
+      if (this.currentAccessToken && window.google.accounts.oauth2) {
+        window.google.accounts.oauth2.revoke(this.currentAccessToken, () => {
+          console.log('✅ Google Calendar access token revoked');
+        });
+      }
+
+      // Clear stored token
+      this.currentAccessToken = null;
+      window.gapi.client.setToken(null);
+
+      console.log('✅ Google Calendar sign-out successful');
     } catch (error) {
       console.error('Google Calendar sign-out failed:', error);
       throw error;
@@ -146,9 +194,8 @@ class GoogleCalendarService {
     if (typeof window === 'undefined') return false;
 
     try {
-      await this.initPromise;
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      return authInstance.isSignedIn.get();
+      // Check if we have a valid access token
+      return this.currentAccessToken !== null && window.gapi.client.getToken() !== null;
     } catch (error) {
       console.error('Failed to check sign-in status:', error);
       return false;
@@ -156,8 +203,7 @@ class GoogleCalendarService {
   }
 
   async refreshToken(auth: GoogleCalendarAuth): Promise<GoogleCalendarAuth> {
-    // For client-side OAuth, we need to check if the token is still valid
-    // and potentially re-authenticate if it's expired
+    // With GIS, we need to request a new token when the current one expires
     if (!auth.tokenExpiry || Date.now() >= auth.tokenExpiry) {
       throw new Error('Token expired - re-authentication required');
     }
@@ -174,6 +220,11 @@ class GoogleCalendarService {
       if (!auth.accessToken || !auth.tokenExpiry || Date.now() >= auth.tokenExpiry) {
         throw new Error('Invalid or expired access token');
       }
+
+      // Ensure the token is set for API calls
+      window.gapi.client.setToken({
+        access_token: auth.accessToken
+      });
 
       const now = new Date();
       const futureDate = new Date();
@@ -241,24 +292,40 @@ class GoogleCalendarService {
     return Math.abs(hash);
   }
 
+  // Helper method to get user email from API
+  private async getUserEmailFromAPI(): Promise<string | null> {
+    try {
+      // Make a lightweight API call to get user info
+      const response = await window.gapi.client.request({
+        path: 'https://www.googleapis.com/oauth2/v2/userinfo'
+      });
+
+      return response.result.email || null;
+    } catch (error) {
+      console.error('Failed to get user email from API:', error);
+      return null;
+    }
+  }
+
   // Helper method to get user info
   async getUserInfo(): Promise<{ email: string; name: string } | null> {
     if (typeof window === 'undefined') return null;
 
     try {
       await this.initPromise;
-      const authInstance = window.gapi.auth2.getAuthInstance();
 
-      if (!authInstance.isSignedIn.get()) {
+      if (!this.currentAccessToken) {
         return null;
       }
 
-      const user = authInstance.currentUser.get();
-      const profile = user.getBasicProfile();
+      // Make API call to get user info
+      const response = await window.gapi.client.request({
+        path: 'https://www.googleapis.com/oauth2/v2/userinfo'
+      });
 
       return {
-        email: profile.getEmail(),
-        name: profile.getName()
+        email: response.result.email || 'unknown@example.com',
+        name: response.result.name || 'Unknown User'
       };
     } catch (error) {
       console.error('Failed to get user info:', error);
