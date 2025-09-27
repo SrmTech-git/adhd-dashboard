@@ -132,31 +132,18 @@ class GoogleCalendarService {
           // Calculate token expiry (GIS doesn't provide exact expiry, typically 1 hour)
           const expiryTime = Date.now() + (response.expires_in ? response.expires_in * 1000 : 3600000);
 
-          // Get user info from the token (we'll need to make an API call for this)
-          this.getUserEmailFromAPI().then(userEmail => {
-            const auth: GoogleCalendarAuth = {
-              isConnected: true,
-              accessToken: response.access_token,
-              refreshToken: null, // Not available in client-side OAuth
-              tokenExpiry: expiryTime,
-              userEmail: userEmail || 'unknown@example.com',
-              lastSync: new Date().toISOString()
-            };
+          // Create auth object directly without API call to avoid 401 error
+          const auth: GoogleCalendarAuth = {
+            isConnected: true,
+            accessToken: response.access_token,
+            refreshToken: null, // Not available in client-side OAuth
+            tokenExpiry: expiryTime,
+            userEmail: 'user@example.com', // Placeholder since we don't need it for calendar access
+            lastSync: new Date().toISOString()
+          };
 
-            console.log('✅ Google Calendar sign-in successful');
-            resolve(auth);
-          }).catch(error => {
-            console.warn('Failed to get user email, using placeholder:', error);
-            const auth: GoogleCalendarAuth = {
-              isConnected: true,
-              accessToken: response.access_token,
-              refreshToken: null,
-              tokenExpiry: expiryTime,
-              userEmail: 'unknown@example.com',
-              lastSync: new Date().toISOString()
-            };
-            resolve(auth);
-          });
+          console.log('✅ Google Calendar sign-in successful');
+          resolve(auth);
         };
 
         // Request access token
