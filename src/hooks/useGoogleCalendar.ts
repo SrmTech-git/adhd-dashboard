@@ -42,8 +42,21 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
           if (savedData.auth.isConnected) {
             // Verify the token is still valid
             if (savedData.auth.tokenExpiry && Date.now() < savedData.auth.tokenExpiry) {
-              // Token is still valid, restore the session
-              console.log('✅ Restoring valid Google Calendar session');
+              // Try to restore the session in the service
+              const restored = await googleCalendarService.restoreSession(savedData.auth);
+              if (restored) {
+                console.log('✅ Google Calendar session restored successfully');
+
+                // Validate the connection is working
+                const isValid = await googleCalendarService.validateConnection();
+                if (!isValid) {
+                  console.warn('⚠️ Session restored but validation failed');
+                  setError('Session restored but connection validation failed');
+                }
+              } else {
+                console.log('❌ Failed to restore Google Calendar session');
+                await disconnect();
+              }
             } else {
               // Token expired, clear the connection
               console.log('❌ Google Calendar token expired, clearing connection');
@@ -133,6 +146,19 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
         throw new Error('Google Calendar not connected');
       }
 
+      // Validate connection before syncing
+      const connectionValid = await googleCalendarService.validateConnection();
+      if (!connectionValid) {
+        console.log('🔄 Connection invalid, attempting to restore session');
+
+        // Try to restore the session
+        const restored = await googleCalendarService.restoreSession(savedData.auth);
+        if (!restored) {
+          await disconnect();
+          throw new Error('Unable to restore Google Calendar session. Please reconnect.');
+        }
+      }
+
       // Check if we need to refresh the token
       let auth = savedData.auth;
       if (auth.tokenExpiry && Date.now() >= auth.tokenExpiry) {
@@ -161,12 +187,27 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
       const updatedAuth = { ...auth, lastSync: new Date().toISOString() };
       DataService.saveGoogleCalendarAuth(updatedAuth);
 
+      console.log('✅ Google Calendar events synced successfully');
+
     } catch (err: any) {
       console.error('Failed to sync Google Calendar events:', err);
-      setError(err.message || 'Failed to sync Google Calendar events');
+
+      // Enhanced error handling
+      let errorMessage = 'Failed to sync Google Calendar events';
+      if (err.message?.includes('gapi.client.setToken not available')) {
+        errorMessage = 'Google API not properly initialized. Please refresh the page and try again.';
+      } else if (err.message?.includes('Invalid or expired access token')) {
+        errorMessage = 'Session expired. Please reconnect to Google Calendar.';
+      } else if (err.message?.includes('Google API client not properly initialized')) {
+        errorMessage = 'Google Calendar service not ready. Please refresh the page and try again.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
 
       // Save error to storage
-      DataService.setGoogleCalendarError(err.message || 'Sync failed');
+      DataService.setGoogleCalendarError(errorMessage);
     } finally {
       setIsLoading(false);
     }

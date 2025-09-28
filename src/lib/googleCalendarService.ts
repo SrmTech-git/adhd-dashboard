@@ -60,11 +60,15 @@ class GoogleCalendarService {
               this.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: this.clientId,
                 scope: this.scope,
-                callback: '', // Will be set dynamically in signIn()
+                callback: this.handleTokenResponse.bind(this), // Use persistent callback
               });
 
               this.isInitialized = true;
               console.log('✅ Google Calendar service initialized with GIS');
+
+              // Try to restore existing session
+              this.restoreSessionFromStorage();
+
               resolve();
             }).catch(reject);
           },
@@ -102,6 +106,60 @@ class GoogleCalendarService {
     });
   }
 
+  // Persistent token response handler
+  private handleTokenResponse(response: any): void {
+    if (response.error) {
+      console.error('Google Calendar token response error:', response.error);
+      return;
+    }
+
+    // Store access token for API calls
+    this.currentAccessToken = response.access_token;
+    this.setTokenInClient(response.access_token);
+
+    console.log('✅ Token received and set in client');
+  }
+
+  // Helper method to safely set token in gapi client
+  private setTokenInClient(accessToken: string): void {
+    if (window.gapi && window.gapi.client && window.gapi.client.setToken) {
+      window.gapi.client.setToken({ access_token: accessToken });
+    } else {
+      console.warn('gapi.client.setToken not available when trying to set token');
+    }
+  }
+
+  // Restore session from localStorage
+  private restoreSessionFromStorage(): void {
+    try {
+      const savedData = this.getStoredAuth();
+      if (savedData && savedData.isConnected && savedData.accessToken) {
+        // Check if token is still valid
+        if (savedData.tokenExpiry && Date.now() < savedData.tokenExpiry) {
+          console.log('🔄 Restoring Google Calendar session from storage');
+          this.currentAccessToken = savedData.accessToken;
+          this.setTokenInClient(savedData.accessToken);
+          console.log('✅ Google Calendar session restored');
+        } else {
+          console.log('❌ Stored Google Calendar token expired');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore session from storage:', error);
+    }
+  }
+
+  // Get stored auth data
+  private getStoredAuth(): GoogleCalendarAuth | null {
+    try {
+      const stored = localStorage.getItem('googleCalendarAuth');
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error('Failed to parse stored auth data:', error);
+      return null;
+    }
+  }
+
   async signIn(): Promise<GoogleCalendarAuth> {
     if (typeof window === 'undefined') {
       throw new Error('Sign-in not available on server side');
@@ -115,19 +173,20 @@ class GoogleCalendarService {
 
     try {
       return new Promise<GoogleCalendarAuth>((resolve, reject) => {
-        // Set callback for this specific sign-in request
+        // Set temporary callback for this sign-in request
+        const originalCallback = this.tokenClient.callback;
         this.tokenClient.callback = (response: any) => {
+          // Restore original callback
+          this.tokenClient.callback = originalCallback;
+
           if (response.error) {
             console.error('Google Calendar sign-in failed:', response.error);
             reject(new Error(response.error));
             return;
           }
 
-          // Store access token for API calls
-          this.currentAccessToken = response.access_token;
-          window.gapi.client.setToken({
-            access_token: response.access_token
-          });
+          // Handle the token response
+          this.handleTokenResponse(response);
 
           // Calculate token expiry (GIS doesn't provide exact expiry, typically 1 hour)
           const expiryTime = Date.now() + (response.expires_in ? response.expires_in * 1000 : 3600000);
@@ -328,6 +387,65 @@ class GoogleCalendarService {
     } catch (error) {
       console.error('Failed to get user info:', error);
       return null;
+    }
+  }
+
+  // Restore session for a given auth object
+  async restoreSession(auth: GoogleCalendarAuth): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      await this.initPromise;
+
+      // Validate the token is not expired
+      if (!auth.accessToken || !auth.tokenExpiry || Date.now() >= auth.tokenExpiry) {
+        console.log('❌ Cannot restore session: token expired or invalid');
+        return false;
+      }
+
+      // Set the token in the service and client
+      this.currentAccessToken = auth.accessToken;
+      this.setTokenInClient(auth.accessToken);
+
+      console.log('✅ Google Calendar session restored externally');
+      return true;
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+      return false;
+    }
+  }
+
+  // Validate current connection state
+  async validateConnection(): Promise<boolean> {
+    if (typeof window === 'undefined') return false;
+
+    try {
+      await this.initPromise;
+
+      // Check if we have a current access token
+      if (!this.currentAccessToken) {
+        console.log('❌ No access token available');
+        return false;
+      }
+
+      // Check if gapi client has a token
+      const clientToken = window.gapi?.client?.getToken();
+      if (!clientToken || !clientToken.access_token) {
+        console.log('❌ gapi client has no token set');
+        return false;
+      }
+
+      // Tokens should match
+      if (clientToken.access_token !== this.currentAccessToken) {
+        console.log('❌ Token mismatch between service and gapi client');
+        return false;
+      }
+
+      console.log('✅ Connection validation passed');
+      return true;
+    } catch (error) {
+      console.error('Connection validation failed:', error);
+      return false;
     }
   }
 
