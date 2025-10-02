@@ -18,6 +18,7 @@ import DailyRoutine from '@/component/DailyRoutine/DailyRoutine';
 import TodoList from '@/component/TodoList/TodoList';
 import Reminders from '@/component/Reminders/Reminders';
 import MoodTracker from '@/component/MoodTracker/MoodTracker';
+import RelationshipManager from '@/component/RelationshipManager/RelationshipManager';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 
 const ADHDDashboard = () => {
@@ -999,18 +1000,23 @@ const formatReminderTime = (reminder: Reminder) => {
           currentTheme={currentTheme}
           isDarkMode={isDarkMode}
         />
-
-        {/* Calendar Section - Full Width */}
-        {/* Calendar Section */}
-          <CalendarComponent
-            events={allEvents}
-            setEvents={setEvents}
-            moods={moods}
-            currentTheme={currentTheme}
-            isDarkMode={isDarkMode}
-          />
-
       </div>
+
+      {/* Relationship Manager Section - Full Width */}
+      <RelationshipManager
+        currentTheme={currentTheme}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Calendar Section - Full Width */}
+      <CalendarComponent
+        events={allEvents}
+        setEvents={setEvents}
+        moods={moods}
+        currentTheme={currentTheme}
+        isDarkMode={isDarkMode}
+      />
+
     </div>
   );
 };

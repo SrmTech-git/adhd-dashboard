@@ -96,11 +96,12 @@ const MoodTracker: React.FC<MoodTrackerProps> = ({
 
             {/* Mood Options */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
               gap: '0.75rem',
               width: '100%',
-              maxWidth: '400px'
+              maxWidth: '100%'
             }}>
               {moodOptions.map((mood) => (
                 <button
@@ -111,13 +112,16 @@ const MoodTracker: React.FC<MoodTrackerProps> = ({
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '0.5rem',
-                    padding: '1rem 0.5rem',
+                    padding: '0.75rem 0.5rem',
+                    minWidth: '60px',
+                    maxWidth: '80px',
+                    flex: '1 1 auto',
                     background: currentTheme.backgroundMuted,
                     border: 'none',
                     borderRadius: '0.75rem',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    fontSize: '0.875rem',
+                    fontSize: '0.75rem',
                     color: currentTheme.textSecondary
                   }}
                   onMouseEnter={(e) => {
@@ -129,7 +133,7 @@ const MoodTracker: React.FC<MoodTrackerProps> = ({
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <span style={{ fontSize: '2rem' }}>{mood.emoji}</span>
+                  <span style={{ fontSize: '1.75rem' }}>{mood.emoji}</span>
                   <span style={{ fontWeight: '500' }}>{mood.label}</span>
                 </button>
               ))}
